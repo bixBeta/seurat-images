@@ -74,9 +74,16 @@ RUN set -eux; \
     air --version
 
 # --- R packages -------------------------------------------------------------
-# pak resolves the entire dependency graph in one solve, honouring the pins.
+# Split into two layers so the heavy CRAN/Bioc install caches independently of
+# the GitHub-package layer; iterating on GitHub pkgs then costs seconds.
 RUN R -q -e "install.packages('pak', repos = Sys.getenv('PPM_SNAPSHOT'))"
-COPY install_packages.R /tmp/install_packages.R
-RUN R -q -f /tmp/install_packages.R && rm -f /tmp/install_packages.R
+
+# Layer 1: pinned Seurat engine + all CRAN/Bioc packages (the long pole).
+COPY install_cran.R /tmp/install_cran.R
+RUN R -q -f /tmp/install_cran.R && rm -f /tmp/install_cran.R
+
+# Layer 2: GitHub-only packages (depend on the Seurat stack from layer 1).
+COPY install_github.R /tmp/install_github.R
+RUN R -q -f /tmp/install_github.R && rm -f /tmp/install_github.R
 
 EXPOSE 8787

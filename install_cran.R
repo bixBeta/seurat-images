@@ -1,19 +1,16 @@
 #!/usr/bin/env Rscript
 # ============================================================================
-# install_packages.R  --  package layer for the TREx single-cell image
+# install_cran.R  --  CRAN + Bioconductor layer (the long pole)
+#
+# Kept separate from the GitHub layer so this heavy install caches on its own:
+# iterating on GitHub-only packages then costs seconds, not a full re-install.
 #
 # Strategy
-#   * CRAN is frozen to a dated Posit Package Manager snapshot (Dockerfile:
-#     PPM_SNAPSHOT) so every "floating" package resolves to one fixed set.
-#   * Bioconductor is fixed to the release matching R 4.4 (3.19).
-#   * The Seurat ecosystem is pinned to the source-environment versions so
-#     SCTransform / clustering output stays comparable to prior analyses.
-#   * pak solves the full graph in one pass, respecting the @version pins;
-#     transitive dependencies resolve to their snapshot-stable versions.
-#
-# To add a package later: append its name to `pkgs` (CRAN or Bioc - pak
-# auto-detects) or `github`, then rebuild. Dependencies are pulled
-# automatically, so only direct-use packages need listing here.
+#   * CRAN frozen to a dated PPM snapshot (Dockerfile: PPM_SNAPSHOT).
+#   * Bioconductor fixed to the release matching R 4.4 (3.20).
+#   * sctransform (SCT engine) + Signac (ATAC) pinned to the source-env
+#     versions; Seurat/SeuratObject float on the v5 line (see note below).
+#   * pak solves the whole graph in one pass, honouring the pins.
 # ============================================================================
 
 options(
@@ -22,24 +19,22 @@ options(
   warn  = 1
 )
 
-# ---- 1. Pinned packages (SCT engine + ATAC) --------------------------------
-# sctransform is the package that actually governs SCTransform numerics, so it
-# is pinned to the source-environment version; Signac is pinned for ATAC /
+# ---- Pinned packages (SCT engine + ATAC) -----------------------------------
+# sctransform governs SCTransform numerics; Signac is pinned for ATAC /
 # multiome reproducibility.
 #
 # Seurat and SeuratObject are intentionally NOT pinned to 5.0.0. qs2 forces a
-# late-2024 snapshot, and in that universe newer Bioc/CRAN packages require
-# Seurat > 5.0.0, so an exact 5.0.0 pin is unsolvable. They float to the
-# snapshot's 5.1.x line. SCT / clustering output is driven by sctransform
-# (pinned) + glmGamPoi, not by Seurat's minor version, so results stay
-# comparable.
+# late-2024 snapshot, and in that universe newer packages require Seurat >
+# 5.0.0, so an exact 5.0.0 pin is unsolvable. They float on the 5.1.x line;
+# SCT / clustering output is driven by sctransform (pinned) + glmGamPoi, not
+# by Seurat's minor version, so results stay comparable.
 pinned <- c(
   "sctransform@0.4.1",
   "Signac@1.12.0"
 )
 
-# ---- 2. Floating packages (snapshot-stable) --------------------------------
-# Mixed CRAN + Bioconductor; pak detects Bioc packages automatically.
+# ---- Floating CRAN + Bioconductor packages (snapshot-stable) ---------------
+# pak auto-detects which are Bioconductor.
 pkgs <- c(
   # -- core workflow / tooling --
   "tidyverse", "data.table", "here", "fs", "glue", "cli",
@@ -89,37 +84,21 @@ pkgs <- c(
   "rmarkdown", "knitr", "quarto", "bookdown", "rmdformats"
 )
 
-# ---- 3. GitHub-only packages -----------------------------------------------
-github <- c(
-  "immunogenomics/presto",
-  "satijalab/azimuth",
-  "satijalab/seurat-wrappers",
-  "mojaveazure/seurat-disk",
-  "satijalab/seurat-data",
-  "bnprks/BPCells",
-  "10XGenomics/loupeR"
-)
-
-# ---- install ---------------------------------------------------------------
-message(">>> Installing pinned Seurat ecosystem + CRAN/Bioc packages ...")
+message(">>> Installing pinned Seurat engine + CRAN/Bioc packages ...")
 pak::pak(c(pinned, pkgs), ask = FALSE, upgrade = FALSE)
 
-message(">>> Installing GitHub packages ...")
-pak::pak(github, ask = FALSE, upgrade = FALSE)
-
-# ---- verify the pins actually took -----------------------------------------
-message(">>> Verifying pinned versions ...")
+# ---- verify the pins + Seurat major version --------------------------------
+message(">>> Verifying versions ...")
 want <- c(sctransform = "0.4.1", Signac = "1.12.0")
 for (p in names(want)) {
   got <- as.character(utils::packageVersion(p))
   flag <- if (identical(got, want[[p]])) "ok" else "MISMATCH"
   message(sprintf("    %-14s want %-8s got %-8s [%s]", p, want[[p]], got, flag))
 }
-# Seurat floats, but must stay on the v5 line.
 sv <- utils::packageVersion("Seurat")
 message(sprintf("    %-14s want 5.x.x   got %-8s [%s]", "Seurat",
                 as.character(sv), if (sv[1, 1] == 5L) "ok" else "MISMATCH"))
 message(sprintf("    %-14s (floated) got %s", "SeuratObject",
                 as.character(utils::packageVersion("SeuratObject"))))
 
-message(">>> Package layer complete.")
+message(">>> CRAN/Bioc layer complete.")
