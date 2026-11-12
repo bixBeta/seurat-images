@@ -22,19 +22,21 @@ options(
   warn  = 1
 )
 
-# ---- 1. Pinned Seurat ecosystem (exact versions, from source env) ----------
-# All three are CRAN packages; pak pulls the exact version (from the archive
-# if the snapshot's current version is newer).
+# ---- 1. Pinned packages (SCT engine + ATAC) --------------------------------
+# sctransform is the package that actually governs SCTransform numerics, so it
+# is pinned to the source-environment version; Signac is pinned for ATAC /
+# multiome reproducibility.
+#
+# Seurat and SeuratObject are intentionally NOT pinned to 5.0.0. qs2 forces a
+# late-2024 snapshot, and in that universe newer Bioc/CRAN packages require
+# Seurat > 5.0.0, so an exact 5.0.0 pin is unsolvable. They float to the
+# snapshot's 5.1.x line. SCT / clustering output is driven by sctransform
+# (pinned) + glmGamPoi, not by Seurat's minor version, so results stay
+# comparable.
 pinned <- c(
-  "Seurat@5.0.0",
   "sctransform@0.4.1",
   "Signac@1.12.0"
 )
-# NOTE: SeuratObject is intentionally NOT pinned to the exact 5.0.0 patch.
-# Seurat 5.0.0 only requires SeuratObject >= 5.0.0, and forcing exactly 5.0.0
-# made the dependency graph unsolvable (surrounding packages expect the 5.0.x
-# bugfix line). It floats to 5.0.x; its patch level does not affect
-# SCTransform / clustering output, and 5.0.2 pairs cleanly with Matrix 1.7.
 
 # ---- 2. Floating packages (snapshot-stable) --------------------------------
 # Mixed CRAN + Bioconductor; pak detects Bioc packages automatically.
@@ -107,12 +109,16 @@ pak::pak(github, ask = FALSE, upgrade = FALSE)
 
 # ---- verify the pins actually took -----------------------------------------
 message(">>> Verifying pinned versions ...")
-want <- c(Seurat = "5.0.0", sctransform = "0.4.1", Signac = "1.12.0")
+want <- c(sctransform = "0.4.1", Signac = "1.12.0")
 for (p in names(want)) {
   got <- as.character(utils::packageVersion(p))
   flag <- if (identical(got, want[[p]])) "ok" else "MISMATCH"
   message(sprintf("    %-14s want %-8s got %-8s [%s]", p, want[[p]], got, flag))
 }
+# Seurat floats, but must stay on the v5 line.
+sv <- utils::packageVersion("Seurat")
+message(sprintf("    %-14s want 5.x.x   got %-8s [%s]", "Seurat",
+                as.character(sv), if (sv[1, 1] == 5L) "ok" else "MISMATCH"))
 message(sprintf("    %-14s (floated) got %s", "SeuratObject",
                 as.character(utils::packageVersion("SeuratObject"))))
 
