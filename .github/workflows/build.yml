@@ -8,7 +8,8 @@ on:
     branches: [main]
     paths:
       - "Dockerfile"
-      - "install_packages.R"
+      - "install_cran.R"
+      - "install_github.R"
       - ".github/workflows/build.yml"
   workflow_dispatch:
 
