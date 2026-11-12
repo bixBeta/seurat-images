@@ -66,4 +66,13 @@ RUN R -q -f /tmp/install_github.R && rm -f /tmp/install_github.R
 COPY install_destiny.R /tmp/install_destiny.R
 RUN R -q -f /tmp/install_destiny.R && rm -f /tmp/install_destiny.R
 
+# --- Layer 5: TBB-enabled qs2 (multithreaded qs_save/qs_read) ---------------
+# The PPM qs2 binary is built without TBB, so nthreads > 1 can't multithread.
+# Install TBB and rebuild qs2 from source with --with-TBB; the check fails the
+# build if multithreading isn't actually working.
+RUN apt-get update && apt-get install -y --no-install-recommends libtbb-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && R -q -e "install.packages('qs2', type='source', configure.args='--with-TBB', repos='https://packagemanager.posit.co/cran/${PPM_DATE}')" \
+    && R -q -e "f <- tempfile(fileext='.qs'); qs2::qs_save(1:10, f, nthreads = 2L); stopifnot(identical(qs2::qs_read(f, nthreads = 2L), 1:10)); cat('qs2 TBB multithreading OK\n')"
+
 EXPOSE 8787
