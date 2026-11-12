@@ -10,6 +10,7 @@ on:
       - "install_seurat.R"
       - "install_rest.R"
       - "install_github.R"
+      - "install_destiny.R"
       - ".github/workflows/build.yml"
   workflow_dispatch:
 

@@ -62,4 +62,8 @@ RUN R -q -f /tmp/install_rest.R && rm -f /tmp/install_rest.R
 COPY install_github.R /tmp/install_github.R
 RUN R -q -f /tmp/install_github.R && rm -f /tmp/install_github.R
 
+# --- Layer 4: destiny (diffusion maps for scSLIDE; needs archived smoother) --
+COPY install_destiny.R /tmp/install_destiny.R
+RUN R -q -f /tmp/install_destiny.R && rm -f /tmp/install_destiny.R
+
 EXPOSE 8787
