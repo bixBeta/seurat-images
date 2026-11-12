@@ -1,9 +1,12 @@
 #!/usr/bin/env Rscript
 # ============================================================================
-# install_github.R  --  GitHub-only packages
+# install_github.R  --  GitHub-only packages (best-effort)
 #
-# Runs after install_cran.R, so the Seurat stack these depend on is already
-# present. Kept in its own Docker layer so fixes here are cheap to iterate.
+# Runs after install_cran.R, so the Seurat stack these depend on is present.
+# These are convenience extras, not the core single-cell stack, so a failure
+# in one does NOT fail the image build: each is attempted independently, any
+# failures are logged loudly (GITHUB_FAILURES:) and the script still exits 0.
+# Kept in its own Docker layer so fixes here are cheap to iterate.
 # ============================================================================
 
 options(
@@ -24,7 +27,26 @@ github <- c(
   "10XGenomics/loupeR"
 )
 
-message(">>> Installing GitHub packages ...")
-pak::pak(github, ask = FALSE, upgrade = FALSE)
+ok <- character(0)
+failed <- character(0)
+for (g in github) {
+  message(sprintf(">>> Installing %s ...", g))
+  res <- tryCatch(
+    {
+      pak::pak(g, ask = FALSE, upgrade = FALSE)
+      TRUE
+    },
+    error = function(e) {
+      message(sprintf("!! FAILED %s: %s", g, conditionMessage(e)))
+      FALSE
+    }
+  )
+  if (isTRUE(res)) ok <- c(ok, g) else failed <- c(failed, g)
+}
 
-message(">>> GitHub layer complete.")
+message(sprintf(">>> GitHub layer: %d ok, %d failed", length(ok), length(failed)))
+if (length(failed)) {
+  # Grep-friendly marker so CI / tooling can spot incomplete extras.
+  message(paste0("GITHUB_FAILURES: ", paste(failed, collapse = " ")))
+}
+# Exit 0 regardless: the image ships with whatever extras succeeded.

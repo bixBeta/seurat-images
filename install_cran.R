@@ -95,9 +95,9 @@ for (p in names(want)) {
   flag <- if (identical(got, want[[p]])) "ok" else "MISMATCH"
   message(sprintf("    %-14s want %-8s got %-8s [%s]", p, want[[p]], got, flag))
 }
-sv <- utils::packageVersion("Seurat")
+sv <- as.character(utils::packageVersion("Seurat"))
 message(sprintf("    %-14s want 5.x.x   got %-8s [%s]", "Seurat",
-                as.character(sv), if (sv[1, 1] == 5L) "ok" else "MISMATCH"))
+                sv, if (startsWith(sv, "5.")) "ok" else "MISMATCH"))
 message(sprintf("    %-14s (floated) got %s", "SeuratObject",
                 as.character(utils::packageVersion("SeuratObject"))))
 
