@@ -12,19 +12,34 @@ options(
   warn  = 1
 )
 
-message(">>> Installing Seurat v6 ecosystem + scSLIDE deps ...")
+message(">>> Installing Seurat v6 core + scSLIDE deps ...")
 pak::pak(c(
   "satijalab/seurat@v6.0.0",   # v6, with native scSLIDE; pulls SeuratObject >= 5.3.0
   "sctransform",
   "Signac",
   "glmGamPoi",                 # Bioc: SCT + scSLIDE DE
-  "destiny",                   # Bioc: scSLIDE diffusion maps
   "pls",                       # scSLIDE: PLS reductions (RunPLS)
   "spls",                      # scSLIDE: sparse PLS
   "harmony",
   "SingleCellExperiment",
   "SummarizedExperiment"
 ), ask = FALSE)
+
+# destiny (diffusion maps, a secondary scSLIDE feature) pulls 'smoother' and a
+# long chain of heavy deps that can fail to resolve. Keep it non-blocking so
+# the image still ships Seurat v6 + the scSLIDE core workflow.
+message(">>> Installing destiny (optional scSLIDE diffusion-map dep) ...")
+destiny_ok <- tryCatch(
+  {
+    pak::pak("destiny", ask = FALSE)
+    TRUE
+  },
+  error = function(e) {
+    message(sprintf("!! destiny skipped: %s", conditionMessage(e)))
+    FALSE
+  }
+)
+if (!destiny_ok) message("DESTINY_SKIPPED")
 
 sv <- as.character(utils::packageVersion("Seurat"))
 message(sprintf(">>> Seurat %s  (want 6.x)  [%s]", sv,
