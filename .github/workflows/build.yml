@@ -1,14 +1,14 @@
-name: build-image
+name: build-image-v6
 
-# Builds the trex-sc image and pushes it to GitHub Container Registry (GHCR).
-# Triggers on every push to main and can be run manually from the Actions tab.
+# Builds the Seurat v6 image and pushes it to GHCR as :v6.
 
 on:
   push:
-    branches: [main]
+    branches: [seurat-v6]
     paths:
       - "Dockerfile"
-      - "install_cran.R"
+      - "install_seurat.R"
+      - "install_rest.R"
       - "install_github.R"
       - ".github/workflows/build.yml"
   workflow_dispatch:
@@ -20,8 +20,6 @@ jobs:
       contents: read
       packages: write
     steps:
-      # Heavy Bioconductor images exceed a stock runner's ~14 GB free space;
-      # reclaim ~25-30 GB by dropping preinstalled toolchains we don't need.
       - name: Free up disk space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -46,16 +44,11 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      # GHCR image names must be lowercase, so the owner is hardcoded.
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/bixbeta/trex-sc:1.0
-            ghcr.io/bixbeta/trex-sc:latest
-          # Registry cache in GHCR: no 10 GB gha-cache cap, so the big R
-          # layers actually cache and the export doesn't drag for an hour.
-          cache-from: type=registry,ref=ghcr.io/bixbeta/trex-sc:buildcache
-          cache-to: type=registry,ref=ghcr.io/bixbeta/trex-sc:buildcache,mode=max
+          tags: ghcr.io/bixbeta/trex-sc:v6
+          cache-from: type=registry,ref=ghcr.io/bixbeta/trex-sc:buildcache-v6
+          cache-to: type=registry,ref=ghcr.io/bixbeta/trex-sc:buildcache-v6,mode=max

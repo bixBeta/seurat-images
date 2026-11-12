@@ -1,88 +1,64 @@
 # syntax=docker/dockerfile:1
 
 # ============================================================================
-# TREx single-cell analysis image
-#   * RStudio Server (web IDE)  +  command-line R (multi-day batch jobs)
-#   * R 4.4.0 / Bioconductor 3.19, CRAN frozen to a dated PPM snapshot
-#   * Seurat ecosystem pinned to the source-environment versions
-#   * Air (Rust R formatter) on PATH for both the IDE and the CLI
+# trex-sc v6 image  --  Seurat v6 (with native scSLIDE) single-cell stack
+#   * RStudio Server + command-line R
+#   * Everything updated to current; Seurat v6 installed from GitHub
+#     (not yet on CRAN) and ships scSLIDE natively.
+#   * Seurat ecosystem is its own early layer so it caches and you can start
+#     working before the long tail finishes.
 #
-# Build:  docker build -t trex-sc:1.0 .
-#         (Dockerfile and install_packages.R must sit in the same directory)
+# Build: pushed to the seurat-v6 branch -> GitHub Actions -> ghcr.io/bixbeta/trex-sc:v6
 # ============================================================================
-FROM rocker/rstudio:4.4.0
+FROM rocker/rstudio:4.5.1
 
-LABEL org.opencontainers.image.title="trex-sc" \
-      org.opencontainers.image.description="Reproducible Seurat v5 single-cell image (RStudio + CLI)" \
-      org.opencontainers.image.authors="bixBeta"
+LABEL org.opencontainers.image.title="trex-sc-v6" \
+      org.opencontainers.image.description="Seurat v6 + scSLIDE single-cell image (RStudio + CLI)"
 
-# --- Reproducibility anchors ------------------------------------------------
-# CRAN frozen to this date; __linux__/jammy serves precompiled binaries for
-# Ubuntu 22.04 (the base OS of rocker/rstudio:4.4.0) -> fast, deterministic.
-ENV PPM_SNAPSHOT="https://packagemanager.posit.co/cran/__linux__/jammy/2024-11-01"
-# Pin Bioconductor to the release that matches R 4.4 (BiocManager reads this).
-# 3.20 (Oct 2024) is in sync with the 2024-11 CRAN freeze and carries qs2.
-ENV R_BIOC_VERSION="3.20"
+# Current CRAN snapshot; Bioconductor defaults to the release matching R 4.5.
+ENV PPM_DATE="2026-11-01"
 ARG AIR_VERSION=0.9.0
 ARG QUARTO_VERSION=1.5.57
 
-# Point CRAN at the frozen snapshot for every R process (IDE + CLI + build).
-RUN echo "options(repos = c(CRAN = '${PPM_SNAPSHOT}'))" \
-      >> "${R_HOME}/etc/Rprofile.site"
+# Distro-aware PPM binary repo (works whether the base is jammy or noble).
+RUN . /etc/os-release && \
+    echo "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/${VERSION_CODENAME}/${PPM_DATE}'))" \
+      >> "${R_HOME}/etc/Rprofile.site" && \
+    echo "base distro: ${VERSION_CODENAME}"
 
-# --- System libraries -------------------------------------------------------
-# Covers hdf5r (hdf5), Signac/genomics (htslib deps: lzma/bz2/zlib, xml),
-# igraph (glpk/gmp), text & graphics (harfbuzz/fribidi/freetype/cairo),
-# magick, RcppGSL (gsl), fftw, and geos.
+# System libraries (names valid on both jammy and noble).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates \
-      patch pkg-config cmake \
-      libhdf5-dev \
-      libglpk-dev libgmp-dev \
-      libgsl-dev \
-      libfftw3-dev \
-      libgeos-dev \
-      libxml2-dev \
-      libcurl4-openssl-dev libssl-dev \
-      libcairo2-dev \
+      curl ca-certificates patch pkg-config cmake \
+      libhdf5-dev libglpk-dev libgmp-dev libgsl-dev libfftw3-dev libgeos-dev \
+      libxml2-dev libcurl4-openssl-dev libssl-dev libcairo2-dev \
       libharfbuzz-dev libfribidi-dev libfreetype6-dev \
-      libpng-dev libjpeg-dev libtiff5-dev \
-      libmagick++-dev \
-      libbz2-dev liblzma-dev zlib1g-dev \
-      libgit2-dev git \
+      libpng-dev libjpeg-dev libtiff-dev libmagick++-dev \
+      libbz2-dev liblzma-dev zlib1g-dev libgit2-dev git \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Quarto CLI (for .qmd reporting) ---------------------------------------
-# rocker/rstudio bundles pandoc but not the Quarto CLI.
+# Quarto CLI
 RUN curl -fsSL -o /tmp/quarto.deb \
       "https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-amd64.deb" \
-    && dpkg -i /tmp/quarto.deb \
-    && rm -f /tmp/quarto.deb \
-    && quarto --version
+    && dpkg -i /tmp/quarto.deb && rm -f /tmp/quarto.deb && quarto --version
 
-# --- Air: Rust-based R formatter (standalone binary, NOT an R package) ------
-# Installed to /usr/local/bin so RStudio users and CLI jobs share one binary.
-RUN set -eux; \
-    export AIR_INSTALL_DIR=/usr/local/bin; \
-    curl -LsSf "https://github.com/posit-dev/air/releases/download/${AIR_VERSION}/air-installer.sh" -o /tmp/air-installer.sh; \
-    sh /tmp/air-installer.sh; \
-    if [ ! -x /usr/local/bin/air ]; then \
-      cp "$(find / -type f -name air -path '*bin*' 2>/dev/null | head -n1)" /usr/local/bin/air; \
-    fi; \
-    chmod 0755 /usr/local/bin/air; \
-    rm -f /tmp/air-installer.sh; \
-    air --version
+# Air (R formatter) binary
+RUN set -eux; export AIR_INSTALL_DIR=/usr/local/bin; \
+    curl -LsSf "https://github.com/posit-dev/air/releases/download/${AIR_VERSION}/air-installer.sh" -o /tmp/air.sh; \
+    sh /tmp/air.sh; \
+    if [ ! -x /usr/local/bin/air ]; then cp "$(find / -type f -name air -path '*bin*' 2>/dev/null | head -n1)" /usr/local/bin/air; fi; \
+    chmod 0755 /usr/local/bin/air; rm -f /tmp/air.sh; air --version
 
-# --- R packages -------------------------------------------------------------
-# Split into two layers so the heavy CRAN/Bioc install caches independently of
-# the GitHub-package layer; iterating on GitHub pkgs then costs seconds.
-RUN R -q -e "install.packages('pak', repos = Sys.getenv('PPM_SNAPSHOT'))"
+RUN R -q -e "install.packages('pak')"
 
-# Layer 1: pinned Seurat engine + all CRAN/Bioc packages (the long pole).
-COPY install_cran.R /tmp/install_cran.R
-RUN R -q -f /tmp/install_cran.R && rm -f /tmp/install_cran.R
+# --- Layer 1: Seurat v6 ecosystem + scSLIDE deps (the fast-start layer) ------
+COPY install_seurat.R /tmp/install_seurat.R
+RUN R -q -f /tmp/install_seurat.R && rm -f /tmp/install_seurat.R
 
-# Layer 2: GitHub-only packages (depend on the Seurat stack from layer 1).
+# --- Layer 2: everything else (CRAN/Bioc) -----------------------------------
+COPY install_rest.R /tmp/install_rest.R
+RUN R -q -f /tmp/install_rest.R && rm -f /tmp/install_rest.R
+
+# --- Layer 3: GitHub extras (best-effort) -----------------------------------
 COPY install_github.R /tmp/install_github.R
 RUN R -q -f /tmp/install_github.R && rm -f /tmp/install_github.R
 
