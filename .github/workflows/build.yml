@@ -55,5 +55,7 @@ jobs:
           tags: |
             ghcr.io/bixbeta/trex-sc:1.0
             ghcr.io/bixbeta/trex-sc:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Registry cache in GHCR: no 10 GB gha-cache cap, so the big R
+          # layers actually cache and the export doesn't drag for an hour.
+          cache-from: type=registry,ref=ghcr.io/bixbeta/trex-sc:buildcache
+          cache-to: type=registry,ref=ghcr.io/bixbeta/trex-sc:buildcache,mode=max
