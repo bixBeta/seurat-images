@@ -24,15 +24,14 @@ which ships the **scSLIDE** sample-level workflow natively.
    you can start working before the rest finishes).
 2. **`install_rest.R`** — the rest of the CRAN/Bioc stack.
 3. **`install_github.R`** — GitHub extras, best-effort.
+4. **`install_destiny.R`** — destiny (diffusion maps), in its own final layer.
 
-## Known gap: `destiny` (diffusion maps)
+## destiny (diffusion maps) — included
 
-`destiny` is a **secondary** scSLIDE dependency (diffusion-map embeddings). Its own
-dependency `smoother` fails to resolve on the current snapshot, so destiny is
-installed **best-effort** and is currently **skipped** (`DESTINY_SKIPPED` in the
-build log). Seurat v6 + the scSLIDE core (sample objects, PLS, DE) are fully
-present. If you need diffusion maps, we can chase the `smoother` fix (install from
-CRAN archive or source) and re-enable destiny.
+`destiny` (diffusion-map embeddings for scSLIDE) is installed. Its dependency
+`smoother` was removed from CRAN on 2025-12-19, so it's pulled from the CRAN
+**archive** (smoother 1.3) in the same solve as destiny. destiny lives in its own
+final Docker layer so it rebuilds in seconds against the registry cache.
 
 ## Pull
 
