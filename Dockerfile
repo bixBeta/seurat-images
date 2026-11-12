@@ -86,4 +86,13 @@ RUN R -q -f /tmp/install_cran.R && rm -f /tmp/install_cran.R
 COPY install_github.R /tmp/install_github.R
 RUN R -q -f /tmp/install_github.R && rm -f /tmp/install_github.R
 
+# Layer 3: TBB-enabled qs2 (multithreaded qs_save/qs_read).
+# The PPM qs2 binary is built without TBB, so nthreads > 1 errors out. Install
+# TBB and rebuild qs2 from source so it links against it. The final check fails
+# the build if multithreading isn't actually working.
+RUN apt-get update && apt-get install -y --no-install-recommends libtbb-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && R -q -e "install.packages('qs2', type='source', repos='https://packagemanager.posit.co/cran/2024-11-01')" \
+    && R -q -e "f <- tempfile(fileext='.qs'); qs2::qs_save(1:10, f, nthreads = 2L); stopifnot(identical(qs2::qs_read(f, nthreads = 2L), 1:10)); cat('qs2 TBB multithreading OK\n')"
+
 EXPOSE 8787
