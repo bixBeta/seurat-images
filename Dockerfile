@@ -36,6 +36,7 @@ RUN echo "options(repos = c(CRAN = '${PPM_SNAPSHOT}'))" \
 # magick, RcppGSL (gsl), fftw, and geos.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates \
+      patch pkg-config cmake \
       libhdf5-dev \
       libglpk-dev libgmp-dev \
       libgsl-dev \
